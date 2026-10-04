@@ -94,3 +94,35 @@ additional CDI ignition control functionality.
 
 This project follows the license of the original Slowduino project.
 See `LICENSE` for details.
+
+### Ignition Outputs
+
+D4 (IGN1) and D5 (IGN2) are shared ignition outputs used for both
+conventional coil control and the CDI control mode added in Slowduino R4.
+
+The ignition mode can be selected from the trigger settings in TunerStudio.
+
+The CDI mode was added primarily for EFI conversions of motorcycles that
+already have an existing CDI ignition system, allowing the original CDI
+hardware to be retained while Slowduino R4 controls fuel injection and
+ignition timing.
+## Arduino R4 Pin Assignment
+
+| Arduino Pin | RA4M1 Pin | Function |
+| :--- | :--- | :--- |
+| D2  | P105 | Trigger (Basic Distributor, Falling Edge) |
+| D4  | P103 | IGN1 (CDI / COIL shared output) |
+| D5  | P102 | IGN2 (CDI / COIL shared output) |
+| D6  | P106 | Fuel Pump |
+| D7  | P107 | Injector 3 |
+| D8  | P304 | Cooling Fan |
+| D9  | P303 | IAC (PWM using AGT1) |
+| D10 | P112 | Injector 1 |
+| D11 | P109 | Injector 2 |
+| D12 | P110 | VSS |
+| A0  | P014 | CLT |
+| A1  | P000 | IAT |
+| A2  | P001 | MAP |
+| A3  | P002 | TPS |
+| A4  | P101 | O2 |
+| A5  | P100 | Battery Voltage |
