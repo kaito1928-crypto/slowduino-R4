@@ -1,40 +1,51 @@
-# Slowduino
-## The Speeduino that runs anywhere
-Slowduino is the fastest way to go from an inexpensive Arduino to a working EFI controller that plays nicely with the official Speeduino tooling. It keeps the same 16×16 maps, protocol, and tuning feel yet runs on an ATmega328p (Uno/Nano) while borrowing only the best ideas from the Speeduino firmware.
+# Slowduino R4
 
-Slowduino is for DIY tuners, hobbyists, educators, and anyone who wants to build a full-featured ECU without the premium price tag. The project ships with ignition control, injection scheduling, sensor support, protective cut logic, and TunerStudio compatibility—everything you need to boot a motor in a garage, classroom, or lean workshop.
+## Slowduino ported to the Arduino UNO R4 / Nano R4
 
-## Runs anywhere: the `tiny` branch
-Most Speeduino-family firmware assumes an ATmega328p and its ~2 KB of RAM as the floor. Slowduino treats that as a starting point, not a limit — it's built to be squeezed down onto much smaller silicon without giving up the Speeduino protocol or the TunerStudio workflow you already know.
+Slowduino R4 is a port of the Slowduino EFI firmware adapted to run on
+Arduino R4-class hardware.
 
-The **[`tiny`](../../tree/tiny)** branch is the proof: the same firmware, re-tuned to run in **587 bytes of RAM (28.7%)** on an unmodified ATmega328p — closing in on the 512-byte budget of the original MS1/Extra hardware (a Motorola 68HC908, not even an AVR, running hand-tuned assembly). It gets there by keeping VE/ignition tables in EEPROM instead of RAM, shrinking serial buffers, dropping the table-lookup cache in favor of recomputing on the fly, and cutting every dead field found along the way. It's an experimental, standalone variant (its own `.ini`, its own tuning chunk sizes — see [`documents/BRANCH_MS1_REDUCAO_RAM.md`](../../blob/tiny/documents/BRANCH_MS1_REDUCAO_RAM.md) for the full breakdown), meant for hobbyists targeting genuinely capped microcontrollers where every byte of RAM counts. The next lever toward 512 bytes isn't in the project code anymore — it's the ~140 bytes the stock Arduino core (`HardwareSerial`, `millis()`'s Timer0 bookkeeping) claims before a single line of Slowduino runs.
+This project is based on Slowduino and brings its lightweight,
+Speeduino-compatible ECU implementation to the Arduino UNO R4 and Nano R4.
 
-That's the point of Slowduino as a project: not "Speeduino on an ATmega328p," but Speeduino's ideas, ported down as far as the hardware will allow.
+The goal of this fork is to preserve the simplicity and TunerStudio-compatible
+workflow of Slowduino while adding support for the newer R4 platform.
 
-## Visual Tour
-![Slowduino board 3D render](resources/PCB_3d.jpeg)
+## About Slowduino
 
-*Slowduino board layout rendered for reference.*
+Slowduino is a lightweight EFI/ECU firmware inspired by Speeduino.
+It provides fuel injection and ignition control, sensor support,
+engine protection features, and TunerStudio compatibility.
 
-## Circuit Diagram
-![Slowduino schematic](resources/Schematic_Slowduino-injection_2026-09-04.png)
+The original Slowduino project primarily targets Arduino Uno/Nano-class
+ATmega328P hardware.
 
-*Injection and ignition wiring overview for the Slowduino board.*
+## What this fork changes
 
-### Highlights
-- Runs on **Arduino Uno/Nano** or Speeduino v0.4 hardware with the same peripheral set and protocol.
-- **16×16 VE + Ignition tables**, closed-loop narrowband control, and Speeduino-style CRC pages for TunerStudio.
-- Deterministic **Timer1-based scheduler** keeps ignition/injection timing inside 20 µs even at 8 000 RPM.
-- Full sensor stack: MAP, TPS, CLT, IAT, O2, battery, oil pressure, fuel pressure, fan, pump, and IAC.
-- **Engine protections** inspired by Speeduino (RPM cut + oil-pressure monitoring) that gate fuel and spark when you need them.
+- Ported Slowduino to Arduino R4-class hardware
+- Added support for Arduino UNO R4
+- Added support for Nano R4
+- Adapted hardware-specific code for the R4 platform
+- Retains the Slowduino/Speeduino-style tuning workflow
+- Retains TunerStudio compatibility
 
-## Explore the Project
-Navigate the docs to learn how to build, tune, and extend Slowduino:
-- [Overview](docs/overview.md): What Slowduino is, why it exists, and how it compares to Speeduino.
-- [Technical Specifications](docs/specifications.md): Hardware platforms, sensors, tables, timing, and EEPROM layout.
-- [Getting Started](docs/getting-started.md): Hardware list, firmware configuration, uploading, and basic calibration.
-- [Communication & Debug](docs/communication-and-debug.md): TunerStudio protocol, serial diagnostics, and troubleshooting tips.
-- [Performance & Roadmap](docs/performance.md): Resource budgets, current limitations, and where we are headed.
-- [Contributing & References](docs/contributing.md): How to help, disclaimers, and essential references.
+## Project status
 
-Ready to flash a board? Start with **Getting Started** and keep this repo bookmarked for reference. Slowduino turns a generic Arduino into a reliable ECU—no custom silicon, no magic.
+This is an experimental community port of Slowduino for Arduino R4 hardware.
+
+Testing and development are ongoing. Use on an actual engine at your own risk.
+
+## Credits
+
+This project is based on **Slowduino**.
+
+Many thanks to the original Slowduino project and its contributors for the
+firmware this R4 port is based on.
+
+Slowduino itself is inspired by and designed to work with the ecosystem and
+tooling established by **Speeduino**.
+
+## License
+
+This project follows the license of the original Slowduino project.
+See `LICENSE` for details.
