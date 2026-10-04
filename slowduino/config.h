@@ -1,0 +1,414 @@
+/**
+ * @file config.h
+ * @brief Configurações, defines e constantes do Slowduino
+ *
+ * Arquivo central de configuração do firmware
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include <Arduino.h>
+#include "globals.h"  // CALIB_POINTS (usado pelas tabelas de calibração padrão abaixo)
+
+// ============================================================================
+// TAMANHO DAS TABELAS
+// ============================================================================
+#define TABLE_SIZE_X        16   // Eixo X (RPM) - 16 pontos
+#define TABLE_SIZE_Y        16   // Eixo Y (MAP/TPS) - 16 pontos
+
+// ============================================================================
+// CONSTANTES DE TIMING
+// ============================================================================
+
+// Timer1 - 16 bits, usado para scheduler de injeção e ignição
+// Prescaler 256: 16MHz / 256 = 62.5kHz -> 16µs por tick
+// Máximo: 65536 * 16µs = 1.048s (cobre cranking lento sem overflow)
+#define TIMER1_PRESCALER    256
+#define TIMER1_RESOLUTION   16.0  // microsegundos por tick (não usado diretamente, apenas doc)
+
+// Conversão de microsegundos para ticks do Timer1
+#define US_TO_TIMER1(us)    ((uint16_t)((us) / 16))
+
+#define TIMER1_TO_US(ticks) ((uint32_t)(ticks) * 16U)
+
+// ============================================================================
+// CONSTANTES DE SENSORES
+// ============================================================================
+
+// Filtros IIR - valores maiores = mais filtro (mais lento)
+// Formula: newValue = (input * (256-alpha) + oldValue * alpha) / 256
+#define FILTER_MAP          20   // MAP: resposta rápida
+#define FILTER_TPS          50   // TPS: média
+#define FILTER_CLT         180   // CLT: muito filtrado (lento)
+#define FILTER_IAT         180   // IAT: muito filtrado (lento)
+#define FILTER_O2          128   // O2: média-alta
+#define FILTER_BAT         128   // Bateria: média-alta
+#define FILTER_OIL_PRESS   100   // Pressão óleo: média
+#define FILTER_FUEL_PRESS  100   // Pressão combustível: média
+
+// Limites de ADC (10-bit: 0-1023)
+#define ADC_MIN             0
+#define ADC_MAX          1023
+
+// Referência ADC (mV)
+#define ADC_VREF         5000    // 5V
+
+// Divisor de tensão da bateria (R1=10K, R2=1K5 -> 14.5V = ~1.87V no ADC)
+// Bateria = (ADC * VREF / 1024) * (R1+R2) / R2
+// Com R1=10K, R2=1K5: multiplicador = 7.67
+#define BAT_MULTIPLIER    767    // * 100 para evitar float
+
+// ============================================================================
+// CALIBRAÇÃO PADRÃO DE CLT/IAT (NTC 10K @ 25°C, Beta ~3950, pull-up 10K)
+// ============================================================================
+// Mesma curva usada como fallback fixo antes desta feature (sensors.cpp,
+// ntcToCelsius); agora é o valor inicial carregado em CalibrationConfig,
+// editável via TunerStudio e persistido em EEPROM_CALIBRATION.
+const uint16_t DEFAULT_CLT_CALIB_ADC[CALIB_POINTS] PROGMEM = {
+  980, 920, 850, 750, 620, 480, 360, 120
+};
+const int8_t DEFAULT_CLT_CALIB_TEMP[CALIB_POINTS] PROGMEM = {
+  -40,   0,  20,  40,  60,  80, 100, 127
+};
+const uint16_t DEFAULT_IAT_CALIB_ADC[CALIB_POINTS] PROGMEM = {
+  980, 920, 850, 750, 620, 480, 360, 120
+};
+const int8_t DEFAULT_IAT_CALIB_TEMP[CALIB_POINTS] PROGMEM = {
+  -40,   0,  20,  40,  60,  80, 100, 127
+};
+
+// O2: default = passthrough linear (ADC 8-bit direto, igual ao comportamento
+// anterior a esta feature)
+#define DEFAULT_O2_MIN   0
+#define DEFAULT_O2_MAX   255
+
+// ============================================================================
+// CONSTANTES DE MOTOR
+// ============================================================================
+
+// RPM
+#define RPM_MIN              50   // RPM mínimo considerado válido
+#define RPM_MAX            8000   // RPM máximo
+#define CRANK_RPM           400   // Abaixo disso = partida
+
+// Timeout para perda de sincronismo (ms)
+#define SYNC_TIMEOUT       1000   // 1 segundo sem dente = perda de sync
+
+// ============================================================================
+// CONSTANTES DE INJEÇÃO
+// ============================================================================
+
+// Limites de pulsewidth (microsegundos)
+#define INJ_MIN_PW          500   // 0.5ms mínimo
+#define INJ_MAX_PW        20000   // 20ms máximo
+
+// Ângulo de injeção padrão (graus BTDC)
+#define INJ_ANGLE_DEFAULT   355   // 5 graus BTDC
+
+// ============================================================================
+// CONSTANTES DE IGNIÇÃO
+// ============================================================================
+
+// Limites de avanço (graus BTDC)
+#define IGN_MIN_ADVANCE    -10    // 10 ATDC (retardo)
+#define IGN_MAX_ADVANCE     45    // 45 BTDC
+
+// Limites de dwell (microsegundos)
+#define DWELL_MIN         1000    // 1ms mínimo
+#define DWELL_MAX         8000    // 8ms máximo
+#define DWELL_DEFAULT     3000    // 3ms padrão
+
+// 0 = bobina (dwell). 1 = CDI (pulso curto no sparkAngle).
+#define IGNITION_MODE_COIL           0
+#define IGNITION_MODE_CDI            1
+#define CDI_TRIGGER_WIDTH_DEFAULT  150    // us. O tick de 16 us entrega 144 us.
+
+// ============================================================================
+// CONSTANTES DE CORREÇÕES
+// ============================================================================
+
+// Base para correções percentuais
+#define CORR_BASE          100
+
+// Limites de correção total
+#define CORR_MIN            50    // 50% = metade do combustível
+#define CORR_MAX           200    // 200% = dobro do combustível
+
+// After-Start Enrichment
+#define ASE_DEFAULT_PCT    150    // 150% durante ASE
+#define ASE_DEFAULT_COUNT   50    // 50 ignições
+
+// Warm-Up Enrichment
+#define WUE_MIN            100    // Sem enriquecimento
+#define WUE_MAX            200    // Dobro
+
+// Acceleration Enrichment
+#define AE_THRESH_DEFAULT   10    // 10%/s de mudança no TPS
+#define AE_PCT_DEFAULT     120    // 20% de enriquecimento
+
+// Closed-loop O2 (EGO) - escala 0-200 ≈ 0-1V narrowband
+#define EGO_TYPE_OFF            0   // Sem correção
+#define EGO_TYPE_NARROW         1   // Narrowband 0-1V
+#define EGO_TYPE_WIDE           2   // Reservado / futuro
+
+#define EGO_ALGO_DISABLED       0
+#define EGO_ALGO_SIMPLE         1
+
+#define EGO_DELAY_DEFAULT      30   // Segundos após motor ligado
+#define EGO_TEMP_DEFAULT       60   // °C mínimo do motor
+#define EGO_RPM_DEFAULT        15   // RPM / 100
+#define EGO_TPS_MAX_DEFAULT    40   // TPS máximo (%)
+#define EGO_MIN_DEFAULT        40   // Leituras fora disso ignoradas
+#define EGO_MAX_DEFAULT       160
+#define EGO_LIMIT_DEFAULT      10   // +/- %
+#define EGO_STEP_DEFAULT        1   // % por iteração
+#define EGO_IGN_EVENTS_DEFAULT  4   // Nº de ignições por passo
+#define EGO_TARGET_DEFAULT    100   // Alvo (~lambda 1.0)
+#define EGO_HYST_DEFAULT        5   // Banda morta ao redor do alvo
+
+// ============================================================================
+// CONFIGURAÇÕES DE COMUNICAÇÃO SERIAL
+// ============================================================================
+
+#define SERIAL_BAUD      115200   // Velocidade padrão TunerStudio
+#define SERIAL_TIMEOUT      100   // Timeout de comando (ms)
+
+// SERIAL_BUFFER_SIZE é definido em comms.h (usado pelo protocolo real).
+
+// Comandos do protocolo TunerStudio simplificado
+#define CMD_READ_REALTIME   'A'   // Lê dados em tempo real
+#define CMD_READ_VE         'V'   // Lê tabela VE
+#define CMD_READ_IGN        'I'   // Lê tabela Ignição
+#define CMD_WRITE_VE        'W'   // Escreve tabela VE
+#define CMD_WRITE_IGN       'X'   // Escreve tabela Ignição
+#define CMD_BURN_EEPROM     'B'   // Salva configuração
+#define CMD_GET_VERSION     'Q'   // Retorna versão
+#define CMD_TEST_COMMS      'T'   // Teste de comunicação
+
+// Respostas
+#define RESP_OK             0x00
+#define RESP_ERROR          0xFF
+
+// ============================================================================
+// LAYOUT DA EEPROM (1024 bytes)
+// ============================================================================
+
+#define EEPROM_VERSION_ADDR     0    // 1 byte - versão
+
+// Tabela VE 16x16
+#define EEPROM_VE_TABLE        10    // 256 bytes (values)
+#define EEPROM_VE_AXIS_X      (EEPROM_VE_TABLE + 256)  // 32 bytes (16 × uint16_t RPM)
+#define EEPROM_VE_AXIS_Y      (EEPROM_VE_AXIS_X + 32)  // 16 bytes (16 × uint8_t MAP)
+
+// Tabela Ignição 16x16
+#define EEPROM_IGN_TABLE      (EEPROM_VE_AXIS_Y + 16)  // 256 bytes (values)
+#define EEPROM_IGN_AXIS_X     (EEPROM_IGN_TABLE + 256) // 32 bytes
+#define EEPROM_IGN_AXIS_Y     (EEPROM_IGN_AXIS_X + 32) // 16 bytes
+
+// Config pages
+#define EEPROM_CONFIG1        (EEPROM_IGN_AXIS_Y + 16) // 128 bytes - fuel config
+#define EEPROM_CONFIG2        (EEPROM_CONFIG1 + 128)   // 128 bytes - ignition config
+
+// Calibração de sensores CLT/IAT/O2 (página 6, ver CalibrationConfig em
+// globals.h). Ocupa o espaço antes reservado (e nunca usado) para AFR.
+#define EEPROM_CALIBRATION     (EEPROM_CONFIG2 + 128)  // 128 bytes
+
+// Reserva para expansão futura (restante da EEPROM)
+#define EEPROM_SPARE          (EEPROM_CALIBRATION + 128)
+#if EEPROM_SPARE > 1024
+#error "Layout EEPROM ultrapassa 1024 bytes"
+#endif
+
+// ============================================================================
+// FLAGS DE TIMER (Loop principal)
+// ============================================================================
+
+// Máscara de bits para controle de tempo no loop
+extern volatile uint8_t loopTimerFlags;
+
+#define TIMER_FLAG_4HZ        0      // 250ms - sensores lentos
+#define TIMER_FLAG_15HZ       1      // ~67ms
+#define TIMER_FLAG_30HZ       2      // ~33ms - sensores médios
+#define TIMER_FLAG_200HZ      3      // 5ms
+#define TIMER_FLAG_1KHZ       4      // 1ms - sensores rápidos
+
+// ============================================================================
+// MODOS DE OPERAÇÃO
+// ============================================================================
+
+// Injector layout
+#define INJ_LAYOUT_PAIRED         0   // Wasted paired (2 canais)
+#define INJ_LAYOUT_SEMI_SEQ       1   // Semi-sequential (4 canais - futuro)
+
+// AE mode
+#define AE_MODE_TPS               0   // Baseado em TPSdot
+#define AE_MODE_MAP               1   // Baseado em MAPdot
+
+// Load algorithm (carga primária usada na VE table e ignition table)
+#define LOAD_ALGORITHM_SPEED_DENSITY 0   // Carga = MAP (padrão)
+#define LOAD_ALGORITHM_ALPHA_N       1   // Carga = TPS (sem sensor MAP confiável/vácuo)
+
+// Trigger patterns
+#define TRIGGER_MISSING_TOOTH     0   // Missing tooth (36-1, 60-2)
+#define TRIGGER_BASIC_DIST        1   // Distribuidor básico (1 dente/rev)
+
+// Trigger edges (compatível com Speeduino)
+#define TRIGGER_EDGE_RISING       0
+#define TRIGGER_EDGE_FALLING      1
+#define TRIGGER_EDGE_BOTH         2
+
+// MAP sampling
+#define MAP_SAMPLE_INSTANT        0   // Leitura instantânea
+#define MAP_SAMPLE_AVERAGE        1   // Média do ciclo
+
+// ============================================================================
+// CONSTANTES DE AUXILIARES
+// ============================================================================
+
+// Ventoinha (Fan)
+#define FAN_ON_TEMP         95    // Liga ventoinha em 95°C
+#define FAN_OFF_TEMP        90    // Desliga em 90°C (histerese)
+
+// Bomba de combustível
+#define FUEL_PUMP_PRIME_MS  2000  // Prime de 2 segundos ao ligar
+
+// Válvula de marcha lenta (IAC)
+// Os parâmetros de tuning agora vivem em ConfigPage2 (EEPROM/TunerStudio).
+// O que sobra aqui é a mecânica do PWM por software.
+
+// Algoritmos (configPage2.iacAlgorithm)
+#define IAC_ALGORITHM_NONE      0   // Sem controle de válvula
+#define IAC_ALGORITHM_PWM_OL    1   // PWM open loop (tabela por CLT)
+#define IAC_ALGORITHM_PWM_OLCL  2   // PWM open loop + PID de malha fechada
+
+// Timer2 em CTC, prescaler 64 @16MHz = 4us por contagem.
+// 63 contagens = 252us por tick -> ~3968Hz de taxa de ISR.
+#define IDLE_PWM_TICK_DIVISOR   63
+#define IDLE_PWM_TICK_HZ        3968UL
+
+// Limites de frequência do PWM. O mínimo garante que o período em ticks caiba
+// num uint8_t (3968/16 = 248); o máximo evita resolução de duty inutilizável.
+#define IDLE_PWM_FREQ_MIN       16    // Hz
+#define IDLE_PWM_FREQ_MAX       500   // Hz
+
+// Anti-windup: acima de (alvo + esta janela) o motor não está em marcha lenta
+#define IDLE_CL_RPM_WINDOW      500   // RPM
+
+// Clamp do acumulador da integral (escala 1/256 -> ±100% de duty)
+#define IDLE_INTEGRAL_LIMIT     25600L
+
+// Idle advance (configPage2.idleAdvEnabled)
+#define IDLE_ADV_OFF            0
+#define IDLE_ADV_ADDED          1   // Soma ao avanço base
+#define IDLE_ADV_SWITCHED       2   // Substitui o avanço base
+
+// Pressão de óleo e combustível (sensores 0-5V = 0-1000 kPa típico)
+#define OIL_PRESS_MIN       50    // Pressão mínima óleo em idle (kPa)
+#define FUEL_PRESS_MIN      250   // Pressão mínima combustível (kPa)
+
+// ============================================================================
+// DEBUG
+// ============================================================================
+
+// Descomente para ativar debug serial (consome RAM e tempo)
+//#define DEBUG_ENABLED
+
+#ifdef DEBUG_ENABLED
+  #define DEBUG_PRINT(x)     Serial.print(x)
+  #define DEBUG_PRINTLN(x)   Serial.println(x)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTLN(x)
+#endif
+
+// ============================================================================
+// VALORES PADRÃO INICIAIS
+// ============================================================================
+
+// Tabela VE padrão (16x16) - valores conservadores para primeiro start
+// 50% VE em idle, 80% em carga média, 100% em alta carga
+// Deve ser ajustado no TunerStudio conforme o motor
+const uint8_t DEFAULT_VE_TABLE[TABLE_SIZE_Y][TABLE_SIZE_X] PROGMEM = {
+  /*  20*/{ 45, 47, 50, 51, 52, 53, 54, 55, 55, 56, 57, 58, 59, 60, 61, 62 },
+  /*  30*/{ 47, 50, 52, 53, 54, 55, 56, 57, 58, 59, 60, 62, 63, 64, 65, 66 },
+  /*  40*/{ 50, 52, 54, 56, 57, 58, 59, 60, 61, 62, 64, 65, 66, 68, 69, 69 },
+  /*  50*/{ 52, 54, 57, 59, 60, 62, 63, 64, 65, 67, 68, 69, 71, 72, 73, 74 },
+  /*  60*/{ 54, 57, 59, 61, 63, 65, 66, 68, 70, 71, 73, 74, 75, 77, 78, 79 },
+  /*  70*/{ 57, 59, 61, 64, 66, 68, 70, 71, 73, 75, 76, 78, 79, 80, 82, 83 },
+  /*  80*/{ 59, 61, 64, 66, 68, 71, 73, 74, 76, 78, 79, 81, 82, 84, 85, 86 },
+  /*  90*/{ 61, 64, 66, 68, 71, 73, 75, 77, 79, 81, 83, 85, 86, 87, 89, 90 },
+  /* 100*/{ 64, 66, 68, 71, 73, 75, 78, 80, 82, 84, 86, 88, 90, 91, 92, 93 },
+  /* 110*/{ 66, 68, 71, 73, 75, 78, 80, 82, 85, 87, 89, 91, 93, 94, 95, 96 },
+  /* 120*/{ 68, 71, 73, 75, 78, 80, 82, 85, 87, 89, 92, 94, 95, 96, 97, 98 },
+  /* 130*/{ 71, 73, 75, 77, 80, 82, 84, 87, 89, 91, 94, 96, 97, 98, 99,100 },
+  /* 140*/{ 73, 75, 77, 79, 81, 83, 86, 88, 90, 92, 95, 97, 98, 99,100,101 },
+  /* 150*/{ 75, 77, 78, 80, 82, 84, 87, 89, 91, 93, 96, 98, 99,100,101,102 },
+  /* 160*/{ 77, 78, 79, 81, 83, 85, 88, 90, 92, 95, 97, 99,100,101,102,104 },
+  /* 170*/{ 78, 79, 80, 82, 84, 87, 89, 91, 94, 96, 98,100,101,102,104,105 }
+};
+
+// Eixos padrão da tabela VE
+const uint16_t DEFAULT_VE_AXIS_X[TABLE_SIZE_X] PROGMEM = {
+   500, 1000, 1500, 2000, 2500, 3000, 3500, 4000,
+  4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000
+};
+
+const uint8_t DEFAULT_VE_AXIS_Y[TABLE_SIZE_Y] PROGMEM = {
+   20,  30,  40,  50,  60,  70,  80,  90,
+  100, 110, 120, 130, 140, 150, 160, 170
+};
+
+// Tabela de Ignição padrão (16x16) - graus BTDC
+// Conservador: mais avanço em baixa carga, menos em alta
+const int8_t DEFAULT_IGN_TABLE[TABLE_SIZE_Y][TABLE_SIZE_X] PROGMEM = {
+  /*  20*/{ 15, 16, 18, 20, 21, 23, 25, 27, 29, 30, 31, 32, 33, 34, 35, 36 },
+  /*  30*/{ 14, 15, 16, 18, 20, 21, 23, 25, 27, 29, 29, 30, 31, 32, 33, 34 },
+  /*  40*/{ 12, 14, 15, 16, 18, 20, 21, 23, 25, 27, 28, 29, 29, 30, 31, 32 },
+  /*  50*/{ 11, 12, 14, 15, 16, 18, 20, 21, 23, 25, 26, 27, 28, 29, 29, 30 },
+  /*  60*/{ 10, 11, 12, 14, 15, 16, 18, 20, 21, 23, 24, 25, 26, 27, 28, 29 },
+  /*  70*/{  9, 10, 11, 12, 14, 15, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27 },
+  /*  80*/{  8,  9, 10, 11, 12, 14, 15, 16, 18, 19, 20, 21, 22, 23, 24, 25 },
+  /*  90*/{  7,  8,  9, 10, 11, 12, 14, 15, 16, 18, 19, 19, 20, 21, 22, 23 },
+  /* 100*/{  7,  7,  8,  9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22 },
+  /* 110*/{  6,  7,  8,  9, 10, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21 },
+  /* 120*/{  5,  6,  7,  8,  9, 10, 11, 12, 14, 15, 16, 17, 18, 18, 19, 20 },
+  /* 130*/{  5,  6,  7,  8,  9, 10, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20 },
+  /* 140*/{  4,  5,  6,  7,  8,  9, 10, 11, 13, 14, 15, 16, 17, 18, 18, 19 },
+  /* 150*/{  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 },
+  /* 160*/{  3,  4,  5,  6,  7,  8,  9, 10, 12, 13, 14, 15, 16, 17, 18, 18 },
+  /* 170*/{  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18 }
+};
+
+// Eixos padrão da tabela Ignição (mesmos da VE)
+const uint16_t DEFAULT_IGN_AXIS_X[TABLE_SIZE_X] PROGMEM = {
+   500, 1000, 1500, 2000, 2500, 3000, 3500, 4000,
+  4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000
+};
+
+const uint8_t DEFAULT_IGN_AXIS_Y[TABLE_SIZE_Y] PROGMEM = {
+   20,  30,  40,  50,  60,  70,  80,  90,
+  100, 110, 120, 130, 140, 150, 160, 170
+};
+
+// Tabela AFR target padrão (lambda% -> 100 = 14.7:1)
+const uint8_t DEFAULT_AFR_TABLE[TABLE_SIZE_Y][TABLE_SIZE_X] PROGMEM = {
+  /*  20*/{110,108,106,105,104,103,102,101,100,100,100,100,100,100,100,100},
+  /*  30*/{108,106,104,103,102,101,100,100, 98, 98, 98, 98, 98, 98, 98, 98},
+  /*  40*/{106,104,103,102,101,100, 98, 97, 96, 96, 96, 96, 96, 96, 96, 96},
+  /*  50*/{104,103,102,101,100, 99, 97, 96, 95, 95, 95, 95, 95, 95, 95, 95},
+  /*  60*/{103,102,101,100, 99, 97, 96, 95, 94, 94, 94, 94, 94, 94, 94, 94},
+  /*  70*/{102,101,100, 99, 98, 96, 95, 94, 93, 93, 93, 93, 93, 93, 93, 93},
+  /*  80*/{101,100, 99, 98, 97, 95, 94, 93, 92, 92, 92, 92, 92, 92, 92, 92},
+  /*  90*/{100, 99, 98, 97, 96, 94, 93, 92, 91, 91, 91, 91, 91, 91, 91, 91},
+  /* 100*/{100, 99, 98, 97, 96, 94, 93, 92, 91, 91, 91, 91, 91, 91, 91, 91},
+  /* 110*/{100, 99, 98, 97, 96, 94, 93, 92, 91, 91, 91, 91, 91, 91, 91, 91},
+  /* 120*/{100, 99, 98, 97, 96, 94, 93, 92, 91, 91, 91, 91, 91, 91, 91, 91},
+  /* 130*/{100, 99, 98, 97, 96, 94, 93, 92, 91, 91, 91, 91, 91, 91, 91, 91},
+  /* 140*/{101,100, 99, 98, 97, 95, 94, 93, 92, 92, 92, 92, 92, 92, 92, 92},
+  /* 150*/{102,101,100, 99, 98, 96, 95, 94, 93, 93, 93, 93, 93, 93, 93, 93},
+  /* 160*/{103,102,101,100, 99, 97, 96, 95, 94, 94, 94, 94, 94, 94, 94, 94},
+  /* 170*/{104,103,102,101,100, 98, 97, 96, 95, 95, 95, 95, 95, 95, 95, 95}
+};
+
+#endif // CONFIG_H
